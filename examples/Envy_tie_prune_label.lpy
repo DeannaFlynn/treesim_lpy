@@ -36,6 +36,41 @@ class Spur(BasicWood):
   def grow(self):
     pass
     
+
+# Created to grow SideBranches off the new trunk 
+class SideBranch(BasicWood):
+  count = 0
+  def __init__(self, copy_from = None,  max_buds_segment: int = 5, thickness: float = 0.1,\
+               thickness_increment: float = 0.01, growth_length: float = 1., max_length: float = 7.,\
+               tie_axis: tuple = (0,1,1), order: int = 1, prototype_dict: dict = {}, name = None, color = None):
+    
+    super().__init__(copy_from, max_buds_segment,thickness, thickness_increment, growth_length,\
+               max_length, tie_axis, order, color)
+    if copy_from:
+      self.__copy_constructor__(copy_from)
+    else:
+      self.prototype_dict = prototype_dict        
+        
+    if not name:
+      self.name = str(self.__class__.__name__) +'_'+ str(self.__class__.count)      
+    SideBranch.count+=1
+
+  # defining if the bud is breaking based on the number of segments, and a random number             
+  def is_bud_break(self, num_buds_segment):
+      return (rd.random() < 0.2*(1 - num_buds_segment/self.max_buds_segment))
+
+  # creates a new branch  
+  def create_branch(self):
+      new_ob =  Spur(copy_from = self.prototype_dict['spur'])
+      return new_ob
+  
+  def grow(self):
+    pass  
+
+
+
+
+
 class Branch(BasicWood):
   count = 0
   def __init__(self, copy_from = None,  max_buds_segment: int = 5, thickness: float = 0.1,\
@@ -52,17 +87,24 @@ class Branch(BasicWood):
     if not name:
       self.name = str(self.__class__.__name__) +'_'+ str(self.__class__.count)      
     Branch.count+=1
-               
+
+  # defining if the bud is breaking based on the number of segments, and a random number             
   def is_bud_break(self, num_buds_segment):
       return (rd.random() < 0.2*(1 - num_buds_segment/self.max_buds_segment))
-    
+
+  # creates a new branch  
   def create_branch(self):
-      new_ob =  Spur(copy_from = self.prototype_dict['spur'])
-      return new_ob
+    if rd.random() < 0.2:
+      return Spur(copy_from = self.prototype_dict['spur'])
+    else:
+      return SideBranch(copy_from = self.prototype_dict['side_branch'])
   
   def grow(self):
     pass  
-    
+
+
+# A class defining the characteristics of the Trunk
+# This is a child class of BasicWood
 class Trunk(BasicWood):
   count = 0
   """ Details of the trunk while growing a tree, length, thickness, where to attach them etc """
@@ -79,12 +121,16 @@ class Trunk(BasicWood):
     if not name:
       self.name = str(self.__class__.__name__) +'_'+ str(self.__class__.count)      
     Trunk.count+=1
-    
+
+  # Determining when a bud breaks on the trunk
   def is_bud_break(self, num_buds_segment):
     if (rd.random() > 0.2*(1 - num_buds_segment/self.max_buds_segment)):
       return False
     return True
     
+  # creates a new branch or spur based on what random value created 
+  # 20% -- Spurs
+  # 80% -- Branch
   def create_branch(self):
     if rd.random() > 0.8:
       return Spur(copy_from = self.prototype_dict['spur'])
@@ -99,15 +145,19 @@ class Trunk(BasicWood):
       
 #Pass transition probabs? --> solve with abstract classes
 
+# creating a dictionary of each type of wood (i.e., Trunk, Branch, Spur)
 basicwood_prototypes = {}
 basicwood_prototypes['trunk'] = Trunk(tie_axis = (0,1,1), max_length = 20, thickness_increment = 0.02, prototype_dict = basicwood_prototypes, color = 0)
 basicwood_prototypes['branch'] = Branch(tie_axis = (0,1,1), max_length = 20, thickness_increment = 0.005, prototype_dict = basicwood_prototypes, color = 1)
+basicwood_prototypes['side_branch'] = Branch(tie_axis = (0,1,1), max_length = 20, thickness_increment = 0.001, prototype_dict = basicwood_prototypes, color = 1)
 basicwood_prototypes['spur'] = Spur(tie_axis = (0,1,1), max_length = 1, thickness_increment = 0.005, prototype_dict = basicwood_prototypes, color = 2)
 
 #init  
-trunk_base = Trunk(copy_from = basicwood_prototypes['trunk'])
+trunk_base = Trunk(copy_from = basicwood_prototypes['trunk']) # copying the trunk from basicwood_prototypes
 time_count = 0
 label = True
+
+# Generates the points where the wires would exist on the V-trellis tree
 def generate_points_v_trellis():
   x = np.full((7,), 18).astype(float)
   z = np.arange(0, 21, 3).astype(float)
@@ -121,33 +171,40 @@ def generate_points_v_trellis():
     id+=1
   return pts
 
-  
 
+# defines the support structure for this tree based on the wire system (i.e., # points, spacing of wires, etc.)  
 support = Support(generate_points_v_trellis(), 14 , 1 , None, (0,0,1), None)
 num_iteration_tie = 5
 
 ###Tying stuff begins
-    
+# Determines the total energy expended by the matrix based on wire.point (a) and branch.end (b) 
+# QUESTION: Where did this equation come from?   
 def ed(a,b):
   return (a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2
-  
+
+
+# Determines the total amount of energy expended from the tree
+# QUESTION: Is arch supposed to be architecture? 
 def get_energy_mat(branches, arch):
-  num_branches = len(branches)
-  num_wires = len(list(arch.branch_supports.values()))
-  energy_matrix = np.ones((num_branches,num_wires))*np.inf
+  num_branches = len(branches) # Get the num of branches
+  num_wires = len(list(arch.branch_supports.values())) # get the number of wires
+  energy_matrix = np.ones((num_branches,num_wires))*np.inf # define an energy matrix by the number of branches x wires
   #print(energy_matrix.shape)
-  for branch_id, branch in enumerate(branches):
-    if branch.has_tied:
+  for branch_id, branch in enumerate(branches): # Loop through branches
+    if branch.has_tied: # continue if branch already tied
       continue
-    for wire_id, wire in arch.branch_supports.items():
-      if wire.num_branch>=1:
+    for wire_id, wire in arch.branch_supports.items(): # loop through the wires in the branch
+      if wire.num_branch>=1: # if wire contains 1 or more branches continue
         continue
+      # calculate the energy expended by the branch on wire
+      # QUESTION: Where did this equation come from?   
       energy_matrix[branch_id][wire_id] = ed(wire.point,branch.end)/2+ed(wire.point,branch.start)/2#+v.num_branches*10+branch.bend_energy(deflection, curr_branch.age)
   return energy_matrix
 
+# Decides where to prune based on the energy matrix
 def decide_guide(energy_matrix, branches, arch):
   for i in range(energy_matrix.shape[0]):
-    min_arg = np.argwhere(energy_matrix == np.min(energy_matrix))
+    min_arg = np.argwhere(energy_matrix == np.min(energy_matrix)) # get the location of the minimum value in the energy matrix
     #print(min_arg)
     if(energy_matrix[min_arg[0][0]][min_arg[0][1]] == np.inf):
       return
@@ -160,40 +217,41 @@ def decide_guide(energy_matrix, branches, arch):
       for j in range(energy_matrix.shape[0]):
         energy_matrix[j][min_arg[0][1]] = np.inf
 
+# Deciding what branches to tie down to the architecture
+# returns True if the branch was tied down 
 def tie(lstring):
   for j,i in enumerate(lstring):
     if i == 'C' and i[0].type.__class__.__name__ == 'Branch':
       if i[0].type.tie_updated == False:
         continue
       curr = i[0]
-      if i[0].type.guide_points:
-        print("tying ", i[0].type.name, i[0].type.guide_target.point)
+      if i[0].type.guide_points: # if the type has guide points 
+        print("tying ", i[0].type.name, i[0].type.guide_target.point) # printing the guide point name
         i[0].type.tie_updated = False
         i[0].type.guide_target.add_branch()
-        lstring, count = i[0].type.tie_lstring(lstring, j)
-       
+        lstring, count = i[0].type.tie_lstring(lstring, j) 
         return True
   return False
         
 #Pruning strategy
-
 def pruning_strategy(lstring): #Remove remnants of cut
   cut = False
   for j,i in enumerate(lstring):
     if i.name == 'C' and i[0].type.age > 8 and i[0].type.has_tied == False and i[0].type.cut == False:
       i[0].type.cut = True      
       print("Cutting", i[0].type.name) 
-      lstring = cut_from(j, lstring)
+      lstring = cut_from(j, lstring) # cut_from in helper.py
       return True
   return False
-  
+
+# Defines the animation of what the tree should look like BEFORE the animation   
 def StartEach(lstring):
   global parent_child_dict
   for i in parent_child_dict[trunk_base.name]:
 	  if i.tie_updated == False:
 	    i.tie_update()
     
-  
+# Defines the animation of what the tree should look like AFTER the animation  
 def EndEach(lstring):
   global parent_child_dict, support
   tied = False  
@@ -213,48 +271,76 @@ def EndEach(lstring):
 parent_child_dict = {}
 parent_child_dict[trunk_base.name] = []	
 #print(generate_points_ufo())
+
+# QUESTION: Do Axioms define what we start with?
 module Attractors
 module grow_object
 module bud
 module branch
-module C
-Axiom: Attractors(support)grow_object(trunk_base)
-derivation length: 30
+module C # stores what the new object represents
+Axiom: Attractors(support)grow_object(trunk_base) 
+derivation length: 20
 
+# defining the set of rules to use 
 production:
 #Decide whether branch internode vs trunk internode need to be the same size.
+# Defining the modules defined above for grow_object, bud, and Attractors
+# QUESTION: What is o? What does it represent? Is it just an object?
 grow_object(o) :
+  # If o is None or larger than the max length, do nothing
   if o == None:
     produce *
   if o.length >= o.max_length:
     nproduce *
-  else:
-    if label:
-      nproduce SetColor(o.color)
-    o.grow_one()
+  else: # If length is less than the max length
+    if label: # if the label is true, then add the rule of setting the color for the respective object
+      nproduce SetColor(o.color) 
+    o.grow_one() # grow a new object 
     produce I(o.growth_length, o.thickness, o)bud(ParameterSet(type = o, num_buds = 0))grow_object(o)
 
 bud(t) :
- if t.type.is_bud_break(t.num_buds):
-   new_object = t.type.create_branch()
-   if new_object == None:
-     produce *
+ if t.type.is_bud_break(t.num_buds): # if the bud breaks, create a new branch
+   new_object = t.type.create_branch() 
+   if new_object == None: # if there is no new object, do nothing
+     produce * 
    parent_child_dict[new_object.name] = []	
    parent_child_dict[t.type.name].append(new_object)
    #Store new object somewhere
    t.num_buds+=1
    t.type.num_branches+=1
-   nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(rd.random()*360)&(rd.random()*90)grow_object(new_object)GetPos(new_object.end)]bud(t)
- 
+   # Adding new parameters to pitch up and down by a certain degree to match what we want to have on the visual proxy tree
+   hAngle = [0, 35, 75, 90, 125, 165, 180, 215, 255, 270, 305, 345]
+   vAngle = [0, 45, 90]
    
-I(s,r,o) --> I(s,r+o.thickness_increment, o)
-_(r) --> _(r+o.thickness_increment)
+   vert = np.int(rd.random()*3)
+   horiz = np.int(rd.random()*12)
+   # Defining the new lstring to generate as the successor
+   # OLD: nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(rd.random()*360)&(rd.random()*90)grow_object(new_object)GetPos(new_object.end)]bud(t)
+   nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(hAngle[horiz])&(vAngle[vert])grow_object(new_object)GetPos(new_object.end)]bud(t)
 
+# following rule produces the following:
+# [] -- push and pop current drawing state onto the stack
+# @R set the head or change the field of view (the multicolored arrows) with 6 points or two vectors
+#   - stores information on the type of object 
+# /(angle) --- rotate counter-clockwise by random angle between 0 and 360
+# &(angle) --- pitch down by a random angle between 0 and 90
+# create a new bud object 
+
+
+# defining simple predecessor to successor code   
+# first line: increment the radius of the object by the thickness 
+# second line: Change the width with radius r to  
+I(s,r,o) --> I(s,r+o.thickness_increment, o) # o is object type, s is length, r radius
+_(r) --> _(r+o.thickness_increment) 
+
+# defines rules to implement before plotting the Lsystem string
+# what it looks like to start
 homomorphism:
 
-I(a,r,o) --> F(a,r)
-S(a,r,o) --> F(a,r)
+I(a,r,o) --> F(a,r) 
+S(a,r,o) --> F(a,r) 
 
+# Rules for the production of Attractors
 production:   
 Attractors(support):
   pttodisplay = support.attractor_grid.get_enabled_points()
