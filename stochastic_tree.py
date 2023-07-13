@@ -117,11 +117,11 @@ class BasicWood(ABC):
               # self.max_length/2, self.tie_axis, self.bud_break_max_length/2, self.order+1, self.bud_break_prob_func)
     
   def update_guide(self, guide_target):
-    curve = []
-    self.guide_target = guide_target
+    curve = [] # an empty value for the curve values
+    self.guide_target = guide_target # set the object's guide target to the parameter of the same name 
     if self.guide_target == -1:
       return
-    if self.has_tied == False:
+    if self.has_tied == False: # if the object is not tied down
       curve, i_target = self.get_control_points(self.guide_target.point, self.start , self.end, self.tie_axis)
     else:
       curve, i_target= self.get_control_points(self.guide_target.point, self.last_tie_location , self.end, self.tie_axis)
@@ -131,7 +131,8 @@ class BasicWood(ABC):
       #self.last_tie_location = copy.deepcopy(Vector3(i_target)) #Replaced by updating location at StartEach
   
   def tie_lstring(self, lstring, index):
-    spline = CSpline(self.guide_points) 
+    # print("Lstring", lstring)
+    spline = CSpline(self.guide_points) # make a Cspline () from 3D points in guide_points
     #print(lstring[index+1].name in ['&','/','SetGuide'], lstring[index+1])
     remove_count = 0
     if not self.has_tied:
@@ -156,13 +157,16 @@ class BasicWood(ABC):
     return (d/2)*(x**2)/(L**3+0.001)*(3*L - x)
   #return d*(1 - np.cos(*np.pi*x/(2*L))) #Axial loading
 
- 
+  # takes in the target, the starting position
   def get_control_points(self, target, start, current, tie_axis):
     pts = []
-    Lcurve = np.sqrt((start[0]-current[0])**2 + (current[1]-start[1])**2 + (current[2]-start[2])**2)   
-    print(Lcurve, start, current)
-    if Lcurve**2 - (target[0]-start[0])**2*tie_axis[0] - (target[1]-start[1])**2*tie_axis[1] - (target[2]-start[2])**2*tie_axis[2]  < 0:
-      print("SHORT")
+    # np.sqrt((start[0]-current[0])**2 + (current[1]-start[1])**2 + (current[2]-start[2])**2)
+    Lcurve = np.sqrt((current[0]-start[0])**2 + (current[1]-start[1])**2 + (current[2]-start[2])**2) # get the Euclidean distance between start and current  
+    print(Lcurve, start, current) 
+
+    # if the square of the length of the curve minus the 
+    if Lcurve**2 - (target[0]-start[0])*tie_axis[0]**2 - (target[1]-start[1])*tie_axis[1]**2 - (target[2]-start[2])*tie_axis[2]**2  < 0:
+      #print("SHORT")
       return pts,None
 
     curve_end = np.sqrt(Lcurve**2 - (target[0]-start[0])*tie_axis[0]**2-(target[1]-start[1])*tie_axis[1]**2 - (target[2]-start[2])*tie_axis[2]**2)
@@ -171,8 +175,8 @@ class BasicWood(ABC):
       if axis == 0:
         i_target[j] = start[j]+target[j]/abs(target[j]+eps)*(curve_end)
         break
-    dxyz = np.array(i_target) - np.array(current)
-    dx = np.array(current) - np.array(start)
+    dxyz = np.array(i_target) - np.array(current) # get the change between the target and current Vector value
+    dx = np.array(current) - np.array(start) # get the change in x
     for i in range(1,10*int(Lcurve)+1):
       x = i/(10*int(Lcurve))
       d = self.deflection_at_x(dxyz, x*Lcurve, Lcurve)
@@ -206,7 +210,9 @@ class Wire():
   
   def add_branch(self):
     self.num_branch+=1 
-  
+
+
+# Class that defines the support system for a particular architecture
 class Support():
   """ All the details needed to figure out how the support is structured in the environment, it is a collection of wires"""
   def __init__(self, points: list, num_wires: int, spacing_wires: int, trunk_wire_pt: tuple,\
