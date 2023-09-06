@@ -7,8 +7,16 @@ from openalea.plantgl.all import *
 import copy
 import numpy as np
 from openalea.plantgl.scenegraph.cspline import CSpline
-# from openalea.plantgl.gui._pglgui.Viewer import camera
 import random as rd
+
+# For using QtWidgets
+from openalea.vpltk.qt import QtWidgets
+from openalea.oalab.paradigm.container import ParadigmContainer
+from openalea.core.service.data import DataFactory
+from openalea.core.path import path as Path
+from openalea.core.path import tempdir
+
+
 
 import collections
 eps = 1e-6
@@ -48,7 +56,6 @@ class BasicWood(ABC):
     if copy_from:
       self.__copy_constructor__(copy_from)
       return
-    
     self.start = Vector3(0,0,0)
     self.end = Vector3(0,0,0)
     #Tying variables    
@@ -56,7 +63,7 @@ class BasicWood(ABC):
     self.has_tied = False
     self.guide_points = []
     self.current_tied = False
-    self.guide_target = -1 #Vector3(0,0,0)
+    self.guide_target = -1#Vector3(0,0,0)
     self.tie_axis = tie_axis
     self.tie_updated = True
     #Information Variables
@@ -72,8 +79,10 @@ class BasicWood(ABC):
     self.thickness = thickness
     self.thickness_increment = thickness_increment
     self.growth_length = growth_length
-    self.max_length = max_length
-        
+    self.max_length = max_length  
+
+    #Viewer.camera.set(Vector3(0, 0, 1), 10.0, -90.0)  
+    
   def __copy_constructor__(self, copy_from):
     update_dict = copy.deepcopy(copy_from.__dict__)
     for k,v in update_dict.items():
@@ -133,7 +142,7 @@ class BasicWood(ABC):
   
   def tie_lstring(self, lstring, index):
     # print("Lstring", lstring)
-    spline = CSpline(self.guide_points) # make a Cspline () from 3D points in guide_points
+    spline = CSpline(self.guide_points) # make a cubic spline from 3D points in guide_points
     #print(lstring[index+1].name in ['&','/','SetGuide'], lstring[index+1])
     remove_count = 0
     if not self.has_tied:
@@ -167,8 +176,8 @@ class BasicWood(ABC):
 
     # if the square of the length of the curve minus the 
     if Lcurve**2 - (target[0]-start[0])*tie_axis[0]**2 - (target[1]-start[1])*tie_axis[1]**2 - (target[2]-start[2])*tie_axis[2]**2  < 0:
-      print("SHORT")
-      return pts, None
+      #print("SHORT")
+      return pts,None
 
     curve_end = np.sqrt(Lcurve**2 - (target[0]-start[0])*tie_axis[0]**2-(target[1]-start[1])*tie_axis[1]**2 - (target[2]-start[2])*tie_axis[2]**2)
     i_target = [target[0], target[1], target[2]]

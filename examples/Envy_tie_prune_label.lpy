@@ -9,6 +9,7 @@ import random as rd
 import copy
 import gc
 import time
+from openalea.plantgl.all import *
 
 from helper import *
 
@@ -57,7 +58,7 @@ class SideBranch(BasicWood):
 
   # defining if the bud is breaking based on the number of segments, and a random number             
   def is_bud_break(self, num_buds_segment):
-      return (rd.random() < 0.2*(1 - num_buds_segment/self.max_buds_segment))
+      return (rd.random() < 0.1*(1 - num_buds_segment/self.max_buds_segment))
 
   # creates a new branch  
   def create_branch(self):
@@ -94,10 +95,11 @@ class Branch(BasicWood):
 
   # creates a new branch  
   def create_branch(self):
+    #return Spur(copy_from = self.prototype_dict['spur'])
     if rd.random() < 0.2:
-      return Spur(copy_from = self.prototype_dict['spur'])
+     return Spur(copy_from = self.prototype_dict['spur'])
     else:
-      return SideBranch(copy_from = self.prototype_dict['side_branch'])
+     return SideBranch(copy_from = self.prototype_dict['side_branch'])
   
   def grow(self):
     pass  
@@ -172,8 +174,8 @@ def generate_points_v_trellis():
   return pts
 
 
-# defines the support structure for this tree based on the wire system (i.e., # points, spacing of wires, etc.)  
-support = Support(generate_points_v_trellis(), 14 , 1 , None, (0,0,1), None)
+# defines the support structure for this tree based on the wire system (i.e., the points, # points, spacing of wires, etc.)  
+support = Support(generate_points_v_trellis(), 14 , 3 , None, (0,0,1), None)
 num_iteration_tie = 5
 
 ###Tying stuff begins
@@ -237,12 +239,18 @@ def tie(lstring):
 def pruning_strategy(lstring): #Remove remnants of cut
   cut = False
   for j,i in enumerate(lstring):
-    if i.name == 'C' and i[0].type.age > 8 and i[0].type.has_tied == False and i[0].type.cut == False:
+    if i.name == 'C' and i[0].type.__class__.__name__ == 'Branch' and i[0].type.age > 8 and i[0].type.has_tied == False and i[0].type.cut == False:
+      i[0].type.cut = True      
+      print("Cutting", i[0].type.name) 
+      lstring = cut_from(j, lstring) # cut_from in helper.py
+      return True
+    elif i.name == 'C' and i[0].type.__class__.__name__ == 'SideBranch' and i[0].type.age > 6 and i[0].type.has_tied == False and i[0].type.cut == False:
       i[0].type.cut = True      
       print("Cutting", i[0].type.name) 
       lstring = cut_from(j, lstring) # cut_from in helper.py
       return True
   return False
+
 
 # Defines the animation of what the tree should look like BEFORE the animation   
 def StartEach(lstring):
@@ -257,11 +265,11 @@ def EndEach(lstring):
   tied = False  
   if (getIterationNb()+1)%num_iteration_tie == 0:
     energy_matrix = get_energy_mat(parent_child_dict[trunk_base.name], support)
-    print(energy_matrix)
+    #print(energy_matrix)
     decide_guide(energy_matrix, parent_child_dict[trunk_base.name], support)
     for branch in parent_child_dict[trunk_base.name]:
       branch.update_guide(branch.guide_target)
-      print(branch.name, branch.guide_target)
+      #print(branch.name, branch.guide_target)
     while tie(lstring):
       pass
     while pruning_strategy(lstring):
@@ -270,7 +278,10 @@ def EndEach(lstring):
   
 parent_child_dict = {}
 parent_child_dict[trunk_base.name] = []	
+
 #print(generate_points_ufo())
+#Viewer.camera.set(Vector3(0,3,0), 0, 0)
+
 
 # QUESTION: Do Axioms define what we start with?
 module Attractors
@@ -283,7 +294,7 @@ derivation length: 20
 
 # defining the set of rules to use 
 production:
-#Decide whether branch internode vs trunk internode need to be the same size.
+# Decide whether branch internode vs trunk internode need to be the same size.
 # Defining the modules defined above for grow_object, bud, and Attractors
 # QUESTION: What is o? What does it represent? Is it just an object?
 grow_object(o) :
@@ -315,8 +326,8 @@ bud(t) :
    vert = np.int(rd.random()*3)
    horiz = np.int(rd.random()*12)
    # Defining the new lstring to generate as the successor
-   # OLD: nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(rd.random()*360)&(rd.random()*90)grow_object(new_object)GetPos(new_object.end)]bud(t)
-   nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(hAngle[horiz])&(vAngle[vert])grow_object(new_object)GetPos(new_object.end)]bud(t)
+   #nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(rd.random()*360)&(rd.random()*90)grow_object(new_object)GetPos(new_object.end)]bud(t)
+   nproduce [@RGetPos(new_object.start)C(ParameterSet(type = new_object))/(hAngle[horiz])&(rd.random()*90)grow_object(new_object)GetPos(new_object.end)]bud(t)
 
 # following rule produces the following:
 # [] -- push and pop current drawing state onto the stack
